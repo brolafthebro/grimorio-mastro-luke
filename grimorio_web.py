@@ -3,25 +3,20 @@ import json
 import re
 import os
 
-# ---------------- CONFIG PAGINA ----------------
+# ---------------- CONFIG ----------------
 st.set_page_config(
     page_title="Grimorio Mastro Luke",
     page_icon="📜",
     layout="centered"
 )
 
-# ---------------- CSS DARK D&D STYLE ----------------
+# ---------------- CSS DARK ----------------
 st.markdown("""
 <style>
-
 .stApp {
     background-color: #121212;
     color: #e6e6e6;
     font-family: 'Crimson Pro', serif;
-}
-
-h1, h2, h3, h4, h5, h6, p, span, label {
-    color: #e6e6e6 !important;
 }
 
 .spell-card {
@@ -30,7 +25,6 @@ h1, h2, h3, h4, h5, h6, p, span, label {
     border-radius: 14px;
     line-height: 1.7;
     box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    animation: fadeIn 0.3s ease-in-out;
 }
 
 .spell-title {
@@ -70,31 +64,18 @@ h1, h2, h3, h4, h5, h6, p, span, label {
 .badge-illusion { background:#5e35b1; }
 .badge-transmutation { background:#fbc02d; color:black; }
 
-.filter-box {
-    background:#1a1a1a;
-    padding:12px;
-    border-radius:12px;
-    margin-bottom:15px;
-}
-
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
-}
-
 @media (max-width:600px) {
     .spell-title { font-size:1.5rem; }
     .spell-card { padding:14px; font-size:0.95rem; }
 }
 
 header, footer {visibility:hidden;}
-
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<h2 style='text-align:center;'>📜 GRIMORIO</h2>", unsafe_allow_html=True)
 
-# ---------------- CARICAMENTO DATI ----------------
+# ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
     for f_name in ["incantesimi_puliti.json", "incantesimi.json"]:
@@ -104,6 +85,10 @@ def load_data():
     return []
 
 spells = load_data()
+
+if not spells:
+    st.error("Nessun file incantesimi trovato.")
+    st.stop()
 
 # ---------------- TRADUZIONI ----------------
 TRAD_SCUOLE = {
@@ -123,25 +108,23 @@ map_cls = {
     "Stregone":"sorcerer","Warlock":"warlock","Mago":"wizard"
 }
 
-# ---------------- STATO ----------------
+# ---------------- SESSION STATE ----------------
 if "selected_spell" not in st.session_state:
     st.session_state.selected_spell = None
 
-# ---------------- RICERCA CON AUTOCOMPLETE ----------------
+# ---------------- RICERCA ----------------
 nomi = sorted([s["name_it"] for s in spells])
 
-st.markdown("### 🔎 Cerca Incantesimo")
-
 search_choice = st.selectbox(
-    "",
-    [""] + nomi,
-    index=0,
-    key="searchbox"
+    "🔎 Cerca incantesimo",
+    [""] + nomi
 )
 
-# ---------------- FILTRI VISIBILI ----------------
-st.markdown("### 🎛️ Filtri")
+# Se selezioni dal cerca → apre subito
+if search_choice:
+    st.session_state.selected_spell = search_choice
 
+# ---------------- FILTRI SEMPRE VISIBILI ----------------
 col1, col2 = st.columns(2)
 
 with col1:
@@ -152,10 +135,7 @@ with col2:
     liv_sel = st.selectbox("Livello", ["Tutti"] + livelli)
 
 # ---------------- FILTRAGGIO ----------------
-filtered = spells
-
-if search_choice:
-    filtered = [s for s in filtered if s["name_it"] == search_choice]
+filtered = spells.copy()
 
 if classe_sel != "Tutte":
     cod = map_cls[classe_sel]
@@ -167,25 +147,22 @@ if liv_sel != "Tutti":
 # ---------------- LISTA ----------------
 if not st.session_state.selected_spell:
 
-    st.markdown("### 📜 Incantesimi")
-
     if not filtered:
-        st.info("Nessun incantesimo trovato.")
+        st.info("Nessun incantesimo trovato con questi filtri.")
     else:
-        for s in sorted(filtered, key=lambda x: x["name_it"]):
+        for s in sorted(filtered, key=lambda x: (int(str(x["level"]).replace("o","0")), x["name_it"])):
+
             scuola = s.get("school","").lower()
             badge = f"<span class='badge badge-{scuola}'>{TRAD_SCUOLE.get(scuola,'')}</span>"
 
-            preview = s.get("description_it","")[:90] + "..."
+            livello = str(s["level"]).replace("o","0")
+            livello_txt = "Trucchetto" if livello=="0" else f"Liv {livello}"
 
-            if st.button(s["name_it"], use_container_width=True):
+            if st.button(f"{s['name_it']}  •  {livello_txt}", use_container_width=True):
                 st.session_state.selected_spell = s["name_it"]
                 st.rerun()
 
-            st.markdown(
-                f"{badge} <span style='font-size:0.85rem;color:#aaa;'>{preview}</span>",
-                unsafe_allow_html=True
-            )
+            st.markdown(badge, unsafe_allow_html=True)
 
 # ---------------- SCHEDA ----------------
 else:
