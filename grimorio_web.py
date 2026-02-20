@@ -3,37 +3,45 @@ import json
 import re
 import os
 
-# ---------------- CONFIG ----------------
 st.set_page_config(
     page_title="Grimorio Mastro Luke",
     page_icon="📜",
     layout="centered"
 )
 
-# ---------------- CSS DARK APP STYLE ----------------
+# ---------------- CSS MOBILE FIRST ----------------
 st.markdown("""
 <style>
+
 .stApp {
     background-color: #121212;
-    color: #e6e6e6;
+    color: #eaeaea;
     font-family: 'Crimson Pro', serif;
 }
 
 h1,h2,h3,h4,h5,h6,p,span,label {
-    color:#e6e6e6 !important;
+    color:#eaeaea !important;
+}
+
+.section-title {
+    font-size:1.1rem;
+    font-weight:bold;
+    margin-top:20px;
+    margin-bottom:10px;
+    color:#ffcc66;
 }
 
 .spell-card {
     background:#1e1e1e;
-    padding:20px;
-    border-radius:14px;
-    line-height:1.7;
-    box-shadow:0 4px 15px rgba(0,0,0,0.4);
+    padding:16px;
+    border-radius:12px;
+    line-height:1.6;
+    margin-bottom:12px;
 }
 
 .spell-title {
     text-align:center;
-    font-size:2rem;
+    font-size:1.8rem;
     font-weight:bold;
     color:#ffcc66;
 }
@@ -45,32 +53,25 @@ h1,h2,h3,h4,h5,h6,p,span,label {
     color:#bbbbbb;
 }
 
-.dice { color:#ff4d4d; font-weight:bold; }
-
-.badge {
-    display:inline-block;
-    padding:5px 10px;
-    border-radius:10px;
-    font-size:0.75rem;
+.dice {
+    color:#ff4d4d;
     font-weight:bold;
-    margin-right:6px;
 }
 
-.badge-evocation { background:#ff7043; }
-.badge-necromancy { background:#8e24aa; }
-.badge-abjuration { background:#039be5; }
-.badge-conjuration { background:#43a047; }
-.badge-divination { background:#00897b; }
-.badge-enchantment { background:#d81b60; }
-.badge-illusion { background:#5e35b1; }
-.badge-transmutation { background:#fbc02d; color:black; }
+/* Pulsanti colorati */
+button[kind="secondary"] {
+    border-radius:10px !important;
+}
 
+/* Riduce spazio verticale mobile */
 @media (max-width:600px){
-    .spell-title{font-size:1.5rem;}
-    .spell-card{padding:14px;font-size:0.95rem;}
+    div[data-testid="column"] {
+        padding:2px !important;
+    }
 }
 
 header, footer {visibility:hidden;}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,7 +88,6 @@ def load_data():
 
 spells = load_data()
 
-# ---------------- TRADUZIONI ----------------
 TRAD_SCUOLE = {
     "abjuration":"Abiurazione",
     "conjuration":"Evocazione",
@@ -100,9 +100,14 @@ TRAD_SCUOLE = {
 }
 
 map_cls = {
-    "Bardo":"bard","Chierico":"cleric","Druido":"druid",
-    "Paladino":"paladin","Ranger":"ranger",
-    "Stregone":"sorcerer","Warlock":"warlock","Mago":"wizard"
+    "Bardo":"bard",
+    "Chierico":"cleric",
+    "Druido":"druid",
+    "Paladino":"paladin",
+    "Ranger":"ranger",
+    "Stregone":"sorcerer",
+    "Warlock":"warlock",
+    "Mago":"wizard"
 }
 
 # ---------------- SESSION STATE ----------------
@@ -110,56 +115,58 @@ for key in ["selected_spell","selected_class","selected_level"]:
     if key not in st.session_state:
         st.session_state[key] = None
 
-# ---------------- RESET FUNCTION ----------------
 def reset_all():
-    st.session_state.selected_spell = None
-    st.session_state.selected_class = None
-    st.session_state.selected_level = None
+    for key in ["selected_spell","selected_class","selected_level"]:
+        st.session_state[key] = None
 
-# ---------------- RICERCA LIVE ----------------
-st.markdown("### 🔎 Cerca")
+# ---------------- RICERCA LIVE CON PREVIEW ----------------
+st.markdown("<div class='section-title'>🔎 Cerca</div>", unsafe_allow_html=True)
 
-search = st.text_input("")
+search = st.text_input("", placeholder="Scrivi nome incantesimo...")
 
 if search:
-    risultati = [
-        s for s in spells
-        if search.lower() in s["name_it"].lower()
-    ]
+    risultati = sorted(
+        [s for s in spells if search.lower() in s["name_it"].lower()],
+        key=lambda x: x["name_it"]
+    )
 
-    for s in risultati[:10]:
-        if st.button(s["name_it"], key=f"search_{s['name_it']}"):
+    for s in risultati[:8]:
+        preview = s.get("description_it","")[:80] + "..."
+        if st.button(s["name_it"], use_container_width=True):
             st.session_state.selected_spell = s["name_it"]
             st.rerun()
+
+        st.markdown(f"<div style='font-size:0.8rem;color:#aaa;margin-bottom:10px;'>{preview}</div>", unsafe_allow_html=True)
 
 # ---------------- CLASSI ----------------
 if not search and not st.session_state.selected_spell:
 
-    st.markdown("### 🎭 Classi")
+    st.markdown("<div class='section-title'>🎭 Classi</div>", unsafe_allow_html=True)
 
-    cols = st.columns(4)
+    cols = st.columns(2)  # 2 colonne mobile-friendly
     for i, cls in enumerate(map_cls.keys()):
-        if cols[i % 4].button(cls):
+        if cols[i % 2].button(cls, use_container_width=True):
             st.session_state.selected_class = cls
             st.session_state.selected_level = None
-            st.session_state.selected_spell = None
             st.rerun()
 
 # ---------------- LIVELLI ----------------
 if st.session_state.selected_class and not st.session_state.selected_spell:
 
-    st.markdown(f"### 🎚 Livelli — {st.session_state.selected_class}")
+    st.markdown(f"<div class='section-title'>🎚 Livelli — {st.session_state.selected_class}</div>", unsafe_allow_html=True)
 
     cod = map_cls[st.session_state.selected_class]
 
     spells_class = [s for s in spells if cod in s.get("classes",[])]
 
-    livelli = sorted(set(int(str(s["level"]).replace("o","0")) for s in spells_class))
+    livelli = sorted(
+        set(int(str(s["level"]).replace("o","0")) for s in spells_class)
+    )
 
-    cols = st.columns(5)
+    cols = st.columns(len(livelli))
     for i, lvl in enumerate(livelli):
         label = "Trucc." if lvl == 0 else str(lvl)
-        if cols[i % 5].button(label):
+        if cols[i].button(label, use_container_width=True):
             st.session_state.selected_level = lvl
             st.rerun()
 
@@ -168,15 +175,18 @@ if st.session_state.selected_level is not None and not st.session_state.selected
 
     cod = map_cls[st.session_state.selected_class]
 
-    spells_filtered = [
-        s for s in spells
-        if cod in s.get("classes",[])
-        and int(str(s["level"]).replace("o","0")) == st.session_state.selected_level
-    ]
+    spells_filtered = sorted(
+        [
+            s for s in spells
+            if cod in s.get("classes",[])
+            and int(str(s["level"]).replace("o","0")) == st.session_state.selected_level
+        ],
+        key=lambda x: x["name_it"]
+    )
 
-    st.markdown("### 📜 Incantesimi")
+    st.markdown("<div class='section-title'>📜 Incantesimi</div>", unsafe_allow_html=True)
 
-    for s in sorted(spells_filtered, key=lambda x: x["name_it"]):
+    for s in spells_filtered:
         if st.button(s["name_it"], use_container_width=True):
             st.session_state.selected_spell = s["name_it"]
             st.rerun()
@@ -193,14 +203,12 @@ if st.session_state.selected_spell:
 
         st.markdown(f"<div class='spell-title'>{spell['name_it']}</div>", unsafe_allow_html=True)
 
-        liv = str(spell["level"]).replace("o","0")
-        testo_liv = "TRUCCHETTO" if liv=="0" else f"LIVELLO {liv}"
+        liv = int(str(spell["level"]).replace("o","0"))
+        testo_liv = "TRUCCHETTO" if liv==0 else f"LIVELLO {liv}"
         scuola = spell.get("school","").lower()
 
-        badge_html = f"<span class='badge badge-{scuola}'>{TRAD_SCUOLE.get(scuola,'')}</span>"
-
         st.markdown(
-            f"<div class='spell-sub'>{testo_liv} • {badge_html}</div>",
+            f"<div class='spell-sub'>{testo_liv} • {TRAD_SCUOLE.get(scuola,'')}</div>",
             unsafe_allow_html=True
         )
 
@@ -216,6 +224,6 @@ if st.session_state.selected_spell:
 
         if spell.get("higher_levels_it"):
             st.markdown(
-                f"<div style='margin-top:15px;'><b>Ai Livelli Superiori:</b> {spell['higher_levels_it']}</div>",
+                f"<div style='margin-top:12px;'><b>Ai Livelli Superiori:</b> {spell['higher_levels_it']}</div>",
                 unsafe_allow_html=True
             )
