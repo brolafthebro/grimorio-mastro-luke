@@ -3,7 +3,8 @@ import json
 import re
 import os
 
-st.set_page_config(page_title="Grimorio", page_icon="📜", layout="centered")
+# Configurazione pagina
+st.set_page_config(page_title="Grimorio Mastro Luke", page_icon="📜", layout="centered")
 
 # --- TRADUZIONI ---
 TRAD_COMP = {"V": "Verbale", "S": "Somatica", "M": "Materiale"}
@@ -14,90 +15,115 @@ TRAD_SCUOLE = {
 }
 TRAD_TEMPI = {"action": "1 Azione", "1 action": "1 Azione", "bonus action": "1 Azione Bonus", "reaction": "1 Reazione"}
 
-# --- CSS OTTIMIZZATO IPHONE ---
+# --- CSS DEFINITIVO (Fix testo bianco e mobile) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;700&display=swap');
-    .stApp { background-color: #fdf5e6; }
-    p, span, label, .stSelectbox { color: #1a1a1a !important; font-family: 'Crimson Pro', serif; }
-    .spell-title { color: #8b0000; font-size: 2rem; font-weight: bold; text-align: center; text-transform: uppercase; margin-bottom: 0px; }
-    .spell-card { 
-        background-color: #fffaf0; border: 1px solid #d4c4a8; border-radius: 8px; 
-        padding: 15px; line-height: 1.5; text-align: left; /* Corretto allineamento */
-        word-wrap: break-word; 
+    
+    /* Forza sfondo pergamena */
+    .stApp { background-color: #fdf5e6 !important; }
+
+    /* Forza testo nero ovunque (evita il bug del testo bianco su iPhone) */
+    .stApp, p, span, label, div, .stSelectbox p, .stMarkdown { 
+        color: #1a1a1a !important; 
+        font-family: 'Crimson Pro', serif !important;
     }
-    .dice { color: #8b0000; font-weight: bold; display: inline-block; } /* Fix allineamento dadi */
+
+    /* Stile Titolo */
+    .spell-title { 
+        color: #8b0000 !important; 
+        font-size: 2.2rem !important; 
+        font-weight: bold !important; 
+        text-align: center; 
+        text-transform: uppercase; 
+        margin-top: 10px;
+    }
+
+    /* Card Descrizione */
+    .spell-card { 
+        background-color: #fffaf0 !important; 
+        border: 1px solid #d4c4a8 !important; 
+        border-radius: 8px; 
+        padding: 15px; 
+        line-height: 1.6; 
+        text-align: justify;
+        color: #1a1a1a !important;
+    }
+
+    /* Dadi Rossi */
+    .dice { color: #8b0000 !important; font-weight: bold !important; }
+
+    /* Nascondi elementi inutili */
     header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
 @st.cache_data
 def load_data():
-    for f in ["incantesimi_puliti.json", "incantesimi.json"]:
-        if os.path.exists(f):
-            with open(f, "r", encoding="utf-8") as file: return json.load(file)
+    for f_name in ["incantesimi_puliti.json", "incantesimi.json"]:
+        if os.path.exists(f_name):
+            with open(f_name, "r", encoding="utf-8") as f:
+                return json.load(f)
     return []
 
 spells = load_data()
 
-# --- LOGICA DI SINCRONIZZAZIONE ---
-if 'selected_spell' not in st.session_state:
-    st.session_state.selected_spell = spells[0]['name_it'] if spells else ""
+# --- LOGICA DI NAVIGAZIONE ---
+st.markdown("<h1 style='text-align: center; color: #8b0000;'>📜 GRIMORIO</h1>", unsafe_allow_html=True)
 
-def update_selection():
-    st.session_state.selected_spell = st.session_state.search_bar
-
-# --- INTERFACCIA ---
-st.markdown("<h2 style='text-align: center; color: #8b0000;'>📜 GRIMORIO</h2>", unsafe_allow_html=True)
-
-# 1. Ricerca
+# 1. BARRA DI RICERCA (Sempre scrivibile)
 nomi_tutti = sorted([s['name_it'] for s in spells])
-scelta_search = st.selectbox("🔍 Cerca Incantesimo:", nomi_tutti, key="search_bar", on_change=update_selection)
+scelta_search = st.selectbox("🔍 Cerca Incantesimo:", [""] + nomi_tutti)
 
-# Trova spell attuale per pre-compilare i filtri
-spell_attuale = next((s for s in spells if s['name_it'] == st.session_state.selected_spell), None)
+st.markdown("<hr style='border: 0.5px solid #d4c4a8; margin: 10px 0;'>", unsafe_allow_html=True)
 
-# 2. Filtri (che seguono la ricerca)
-col_a, col_b = st.columns(2)
-with col_a:
-    classi_disp = ["Bardo", "Chierico", "Druido", "Paladino", "Ranger", "Stregone", "Warlock", "Mago"]
-    # Se lo spell ha classi, proviamo a selezionare la prima disponibile
-    default_cls = 0
-    if spell_attuale:
-        for i, c in enumerate(classi_disp):
-            if c.lower() in [cl.lower() for cl in spell_attuale.get('classes', [])]:
-                default_cls = i
-                break
-    classe_sel = st.selectbox("Classe:", classi_disp, index=default_cls)
+# 2. FILTRI CLASSE/LIVELLO (Se non si usa la ricerca)
+col1, col2 = st.columns(2)
+with col1:
+    classe_sel = st.selectbox("Filtra Classe:", ["Bardo", "Chierico", "Druido", "Paladino", "Ranger", "Stregone", "Warlock", "Mago"])
+with col2:
+    liv_sel = st.selectbox("Livello:", range(10))
 
-with col_b:
-    liv_default = int(str(spell_attuale.get('level', '0')).replace('o','0')) if spell_attuale else 0
-    liv_sel = st.selectbox("Livello:", range(10), index=liv_default)
+# Filtriamo la lista in base ai menu
+cod_cls = {"Bardo":"bard","Chierico":"cleric","Druido":"druid","Paladino":"paladin","Ranger":"ranger","Stregone":"sorcerer","Warlock":"warlock","Mago":"wizard"}[classe_sel]
+sp_filtrati = [s for s in spells if cod_cls in s.get('classes', []) and int(str(s.get('level', 0)).replace('o','0')) == liv_sel]
+nomi_filtrati = sorted([s['name_it'] for s in sp_filtrati])
+
+scelta_lista = st.selectbox("Oppure seleziona dalla lista:", [""] + nomi_filtrati)
+
+# --- SCELTA FINALE ---
+# Se l'utente ha usato la barra di ricerca, mostriamo quello. Altrimenti la lista filtrata.
+nome_finale = scelta_search if scelta_search != "" else scelta_lista
 
 # --- VISUALIZZAZIONE ---
-if spell_attuale:
-    st.markdown(f'<p class="spell-title">{spell_attuale["name_it"]}</p>', unsafe_allow_html=True)
-    liv = str(spell_attuale.get('level', '0')).replace('o', '0')
-    scuola = TRAD_SCUOLE.get(spell_attuale.get('school','').lower(), 'Variante')
-    st.markdown(f"<p style='text-align:center;'><i>{'TRUCCHETTO' if liv=='0' else f'LIVELLO {liv}'} • {scuola}</i></p>", unsafe_allow_html=True)
-    
-    st.markdown("<hr style='border: 1px solid #8b0000; margin: 5px 0;'>", unsafe_allow_html=True)
-    
-    # Dati tecnici tradotti
-    c1, c2 = st.columns(2)
-    with c1:
-        tempo = spell_attuale.get('action_type', '').lower()
-        st.markdown(f"**Tempo:** {TRAD_TEMPI.get(tempo, tempo)}")
-        st.markdown(f"**Gittata:** {spell_attuale.get('range', '-')}")
-    with c2:
-        st.markdown(f"**Durata:** {spell_attuale.get('duration', '-')}")
-        comps = [TRAD_COMP.get(c, c) for c in spell_attuale.get('components', [])]
-        st.markdown(f"**Componenti:** {', '.join(comps)}")
+if nome_finale:
+    spell = next((s for s in spells if s['name_it'] == nome_finale), None)
+    if spell:
+        st.markdown(f'<p class="spell-title">{spell["name_it"]}</p>', unsafe_allow_html=True)
+        liv = str(spell.get('level', '0')).replace('o', '0')
+        scuola = TRAD_SCUOLE.get(spell.get('school','').lower(), 'Variante')
+        st.markdown(f"<p style='text-align:center; margin-top:-10px;'><i>{'TRUCCHETTO' if liv=='0' else f'LIVELLO {liv}'} • {scuola}</i></p>", unsafe_allow_html=True)
+        
+        st.markdown("<hr style='border: 1.5px solid #8b0000; margin: 10px 0;'>", unsafe_allow_html=True)
+        
+        # Dati Tecnici
+        c1, c2 = st.columns(2)
+        with c1:
+            tempo_raw = spell.get('action_type', '').lower()
+            st.markdown(f"**Tempo:** {TRAD_TEMPI.get(tempo_raw, tempo_raw)}")
+            st.markdown(f"**Gittata:** {spell.get('range', '-')}")
+        with c2:
+            st.markdown(f"**Durata:** {spell.get('duration', '-')}")
+            comps = [TRAD_COMP.get(c, c) for c in spell.get('components', [])]
+            st.markdown(f"**Componenti:** {', '.join(comps)}")
 
-    st.markdown("<hr style='border: 1px solid #8b0000; margin: 5px 0;'>", unsafe_allow_html=True)
-    
-    desc = spell_attuale.get('description_it', '')
-    # Evidenzia dadi senza rompere il layout
-    desc_html = re.sub(r'(\d+d\d+|\b\d+\b)', r'<span class="dice">\1</span>', desc)
-    
-    st.markdown(f'<div class="spell-card">{desc_html.replace("\n", "<br>")}</div>', unsafe_allow_html=True)
+        st.markdown("<hr style='border: 1.5px solid #8b0000; margin: 10px 0;'>", unsafe_allow_html=True)
+        
+        # Descrizione
+        desc = spell.get('description_it', '')
+        # Evidenzia i numeri in rosso
+        desc_html = re.sub(r'(\d+d\d+|\b\d+\b)', r'<span class="dice">\1</span>', desc)
+        
+        st.markdown(f'<div class="spell-card">{desc_html.replace("\n", "<br>")}</div>', unsafe_allow_html=True)
+else:
+    st.info("Utilizza la barra di ricerca o i filtri per visualizzare un incantesimo.")
