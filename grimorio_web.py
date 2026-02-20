@@ -3,136 +3,131 @@ import json
 import re
 import os
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Grimorio Mastro Luke", page_icon="📜", layout="centered")
+# Configurazione per Mobile
+st.set_page_config(page_title="Grimorio", page_icon="📜", layout="centered")
 
-# --- CSS PERSONALIZZATO (Colori e Numeri Rossi) ---
+# --- TRADUZIONI ---
+TRAD_COMP = {"V": "Verbale", "S": "Somatica", "M": "Materiale"}
+TRAD_SCUOLE = {
+    "abjuration": "Abiurazione", "conjuration": "Evocazione", "divination": "Divinazione",
+    "enchantment": "Ammaliamento", "evocation": "Invocazione", "illusion": "Illusione",
+    "necromancy": "Negromanzia", "transmutation": "Trasmutazione"
+}
+
+# --- CSS MOBILE-FIRST ---
 st.markdown("""
     <style>
-    /* Sfondo e Font */
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;700&display=swap');
-
-    .stApp {
-        background-color: #fdf5e6;
-    }
     
-    /* Testo Generale */
-    .stApp, p, span, label {
-        color: #1a1a1a !important;
+    .stApp { background-color: #fdf5e6; }
+    
+    /* Forza il testo nero e leggibile */
+    p, span, label, .stSelectbox { 
+        color: #1a1a1a !important; 
         font-family: 'Crimson Pro', serif;
-        font-size: 1.1rem;
     }
 
-    /* Sidebar scura */
-    [data-testid="stSidebar"] {
-        background-color: #2b2b2b;
-    }
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
-
-    /* Titolo Incantesimo */
+    /* Titolo enorme stile D&D */
     .spell-title {
         color: #8b0000;
-        font-family: 'Crimson Pro', serif;
-        font-weight: 700;
+        font-size: 2.2rem;
+        font-weight: bold;
+        text-align: center;
         text-transform: uppercase;
-        font-size: 2.5rem;
         margin-bottom: 0px;
     }
 
-    /* Numeri e Dadi in Rosso */
-    .dice-num {
-        color: #8b0000;
-        font-weight: bold;
+    /* Card per la descrizione */
+    .spell-card {
+        background-color: #fffaf0;
+        border: 1px solid #d4c4a8;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        line-height: 1.6;
+        text-align: justify;
     }
 
-    /* Separatore Bordeaux */
-    .bordeaux-line {
-        border-top: 3px solid #8b0000;
-        margin: 10px 0;
-    }
+    /* Numeri dadi rossi */
+    .dice { color: #8b0000; font-weight: bold; }
+
+    /* Nascondi header streamlit inutile su mobile */
+    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARICAMENTO DATI ---
+# --- FUNZIONI DI PULIZIA ---
+def pulizia_live(desc, durata):
+    if not desc or not durata: return desc
+    # Rimuove frammenti della durata dall'inizio della descrizione
+    parti = re.findall(r'\w+', durata.lower()) + ["fino", "a", "ora", "minuto", "round"]
+    desc = desc.lstrip(' \t\n\r\f\v.,:;-')
+    for _ in range(5):
+        for p in sorted(parti, key=len, reverse=True):
+            if len(p) < 2 and p != "a": continue
+            pattern = re.compile(r'^' + re.escape(p) + r'\b', re.IGNORECASE)
+            if pattern.search(desc):
+                desc = pattern.sub('', desc, count=1).lstrip(' \t\n\r\f\v.,:;-')
+    return desc[0].upper() + desc[1:] if desc else ""
+
 @st.cache_data
-def load_spells():
-    if os.path.exists("incantesimi_puliti.json"):
-        with open("incantesimi_puliti.json", "r", encoding="utf-8") as f:
-            return json.load(f)
-    elif os.path.exists("incantesimi.json"):
-        with open("incantesimi.json", "r", encoding="utf-8") as f:
-            return json.load(f)
+def load_data():
+    files = ["incantesimi_puliti.json", "incantesimi.json"]
+    for f_name in files:
+        if os.path.exists(f_name):
+            with open(f_name, "r", encoding="utf-8") as f:
+                return json.load(f)
     return []
 
-spells = load_spells()
+spells = load_data()
 
-DIZ_CLASSI = {
-    "Bardo": "bard", "Chierico": "cleric", "Druido": "druid", 
-    "Paladino": "paladin", "Ranger": "ranger", "Stregone": "sorcerer", 
-    "Warlock": "warlock", "Mago": "wizard"
-}
+# --- INTERFACCIA CENTRALE (NIENTE SIDEBAR) ---
+st.markdown("<h2 style='text-align: center; color: #8b0000;'>📜 GRIMORIO</h2>", unsafe_allow_html=True)
 
-# --- LOGICA DI RICERCA NELLA SIDEBAR ---
-st.sidebar.title("📜 GRIMORIO")
-
-# 1. BARRA DI RICERCA (Sostituisce l'anteprima di tkinter con una lista filtrabile)
+# 1. Ricerca Globale
 nomi_tutti = sorted([s['name_it'] for s in spells])
-scelta_ricerca = st.sidebar.selectbox("Cerca Incantesimo (scrivi il nome):", [""] + nomi_tutti)
+scelta_search = st.selectbox("🔍 Cerca per nome:", [""] + nomi_tutti, help="Scrivi il nome dell'incantesimo")
 
-st.sidebar.markdown("---")
+st.markdown("<div style='margin: 10px 0; border-top: 1px solid #d4c4a8;'></div>", unsafe_allow_html=True)
 
-# 2. FILTRI TRADIZIONALI
-classe_sel = st.sidebar.selectbox("Classe", list(DIZ_CLASSI.keys()))
-codice_classe = DIZ_CLASSI[classe_sel]
-spells_classe = [s for s in spells if codice_classe in s.get('classes', [])]
+# 2. Filtri rapidi (in colonne per occupare meno spazio verticale)
+col_a, col_b = st.columns(2)
+with col_a:
+    classe_sel = st.selectbox("Classe:", ["Bardo", "Chierico", "Druido", "Paladino", "Ranger", "Stregone", "Warlock", "Mago"])
+with col_b:
+    cod_cls = {"Bardo":"bard","Chierico":"cleric","Druido":"druid","Paladino":"paladin","Ranger":"ranger","Stregone":"sorcerer","Warlock":"warlock","Mago":"wizard"}[classe_sel]
+    sp_cls = [s for s in spells if cod_cls in s.get('classes', [])]
+    livelli = sorted(list(set([int(str(s['level']).replace('o','0')) for s in sp_cls])))
+    liv_sel = st.selectbox("Livello:", livelli)
 
-livelli = sorted(list(set([int(str(s['level']).replace('o','0')) for s in spells_classe])))
-liv_sel = st.sidebar.selectbox("Livello", livelli)
+nomi_filtro = sorted([s['name_it'] for s in sp_cls if int(str(s['level']).replace('o','0')) == liv_sel])
+scelta_lista = st.selectbox("Seleziona dalla lista:", nomi_filtro)
 
-nomi_filtrati = sorted([s['name_it'] for s in spells_classe if int(str(s['level']).replace('o','0')) == liv_sel])
-scelta_menu = st.sidebar.selectbox("Seleziona dalla lista:", nomi_filtrati)
+# --- LOGICA VISUALIZZAZIONE ---
+nome_final = scelta_search if scelta_search != "" else scelta_lista
+spell = next((s for s in spells if s['name_it'] == nome_final), None)
 
-# --- DETERMINAZIONE SPELL DA MOSTRARE ---
-# Se l'utente ha usato la barra di ricerca, vince quella. Altrimenti il menu.
-nome_finale = scelta_ricerca if scelta_ricerca != "" else scelta_menu
-spell = next((s for s in spells if s['name_it'] == nome_finale), None)
-
-# --- VISUALIZZAZIONE ---
 if spell:
-    # Titolo
     st.markdown(f'<p class="spell-title">{spell["name_it"]}</p>', unsafe_allow_html=True)
-    
-    # Sottotitolo livello
     liv = str(spell.get('level', '0')).replace('o', '0')
-    testo_liv = "TRUCCHETTO" if liv == "0" else f"INCANTESIMO DI LIVELLO {liv}"
-    st.markdown(f"*{testo_liv}*")
+    st.markdown(f"<p style='text-align:center; margin-top:-10px;'><i>{'TRUCCHETTO' if liv=='0' else f'LIVELLO {liv}'} • {TRAD_SCUOLE.get(spell.get('school','').lower(), 'Variante')}</i></p>", unsafe_allow_html=True)
     
-    st.markdown('<div class="bordeaux-line"></div>', unsafe_allow_html=True)
-    
-    # Dati Tecnici
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"**Tempo di Lancio:** {spell.get('action_type', '-')}")
-        st.write(f"**Gittata:** {spell.get('range', '-')}")
-    with col2:
-        st.write(f"**Durata:** {spell.get('duration', '-')}")
-        st.write(f"**Componenti:** {', '.join(spell.get('components', []))}")
+    # Info compatte per mobile
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"**Tempo:** {spell.get('action_type', '-')}")
+        st.markdown(f"**Gittata:** {spell.get('range', '-')}")
+    with c2:
+        st.markdown(f"**Durata:** {spell.get('duration', '-')}")
+        comps = [TRAD_COMP.get(c, c) for c in spell.get('components', [])]
+        st.markdown(f"**Componenti:** {', '.join(comps)}")
 
-    st.markdown('<div class="bordeaux-line"></div>', unsafe_allow_html=True)
+    st.markdown("<hr style='border: 1px solid #8b0000;'>", unsafe_allow_html=True)
     
-    # Descrizione con Numeri Rossi
-    desc = spell.get('description_it', '')
+    # Descrizione pulita e formattata
+    desc_pulita = pulizia_live(spell.get('description_it', ''), spell.get('duration', ''))
+    desc_html = re.sub(r'(\d+d\d+|\b\d+\b)', r'<span class="dice">\1</span>', desc_pulita)
     
-    # Regex per evidenziare numeri e dadi in rosso bordeaux
-    # Trova dadi (1d8) e numeri singoli (\d+)
-    desc_evidenziata = re.sub(r'(\d+d\d+|\b\d+\b)', r'<span class="dice-num">\1</span>', desc)
-    
-    st.markdown(f"""
-        <div style="text-align: justify; line-height: 1.6;">
-            {desc_evidenziata.replace('\n', '<br>')}
-        </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("Seleziona un incantesimo dalla ricerca o dai filtri per visualizzarlo.")
+    st.markdown(f'<div class="spell-card">{desc_html.replace("\n", "<br>")}</div>', unsafe_allow_html=True)
