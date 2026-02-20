@@ -10,95 +10,89 @@ st.set_page_config(
     layout="centered"
 )
 
-# ---------------- DARK MODE TOGGLE ----------------
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-
-col_dark, col_title = st.columns([1,4])
-with col_dark:
-    st.session_state.dark_mode = st.toggle("🌙 Dark", value=st.session_state.dark_mode)
-
-with col_title:
-    st.markdown("<h2 style='text-align:center;'>📜 GRIMORIO</h2>", unsafe_allow_html=True)
-
-# ---------------- CSS DINAMICO ----------------
-if st.session_state.dark_mode:
-    bg = "#1b1b1b"
-    text = "#f5f5f5"
-    card = "#262626"
-else:
-    bg = "#fdf5e6"
-    text = "#1a1a1a"
-    card = "#fffaf0"
-
-st.markdown(f"""
+# ---------------- CSS DARK D&D STYLE ----------------
+st.markdown("""
 <style>
 
-.stApp {{
-    background-color: {bg};
-    color: {text};
+.stApp {
+    background-color: #121212;
+    color: #e6e6e6;
     font-family: 'Crimson Pro', serif;
-}}
+}
 
-.spell-card {{
-    background-color: {card};
-    padding: 18px;
-    border-radius: 12px;
-    line-height: 1.6;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    animation: fadeIn 0.4s ease-in-out;
-}}
+h1, h2, h3, h4, h5, h6, p, span, label {
+    color: #e6e6e6 !important;
+}
 
-.spell-title {{
+.spell-card {
+    background-color: #1e1e1e;
+    padding: 20px;
+    border-radius: 14px;
+    line-height: 1.7;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.spell-title {
     text-align: center;
     font-size: 2rem;
     font-weight: bold;
-    color: #b22222;
-}}
+    color: #ffcc66;
+}
 
-.spell-sub {{
+.spell-sub {
     text-align: center;
     font-style: italic;
-    margin-bottom: 10px;
-}}
+    margin-bottom: 12px;
+    color: #bbbbbb;
+}
 
-.dice {{
-    color: #d00000;
+.dice {
+    color: #ff4d4d;
     font-weight: bold;
-}}
+}
 
-.badge {{
+.badge {
     display:inline-block;
-    padding:4px 8px;
-    border-radius:8px;
-    font-size:0.8rem;
+    padding:5px 10px;
+    border-radius:10px;
+    font-size:0.75rem;
     font-weight:bold;
-    margin-right:4px;
-}}
+    margin-right:6px;
+}
 
-.badge-evocation {{ background:#ff7043; color:white; }}
-.badge-necromancy {{ background:#6a1b9a; color:white; }}
-.badge-abjuration {{ background:#0277bd; color:white; }}
-.badge-conjuration {{ background:#2e7d32; color:white; }}
-.badge-divination {{ background:#00897b; color:white; }}
-.badge-enchantment {{ background:#c2185b; color:white; }}
-.badge-illusion {{ background:#512da8; color:white; }}
-.badge-transmutation {{ background:#f9a825; color:black; }}
+.badge-evocation { background:#ff7043; }
+.badge-necromancy { background:#8e24aa; }
+.badge-abjuration { background:#039be5; }
+.badge-conjuration { background:#43a047; }
+.badge-divination { background:#00897b; }
+.badge-enchantment { background:#d81b60; }
+.badge-illusion { background:#5e35b1; }
+.badge-transmutation { background:#fbc02d; color:black; }
 
-@keyframes fadeIn {{
-    from {{opacity:0; transform:translateY(10px);}}
-    to {{opacity:1; transform:translateY(0);}}
-}}
+.filter-box {
+    background:#1a1a1a;
+    padding:12px;
+    border-radius:12px;
+    margin-bottom:15px;
+}
 
-@media (max-width:600px) {{
-    .spell-title {{ font-size:1.5rem; }}
-    .spell-card {{ padding:12px; font-size:0.95rem; }}
-}}
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
 
-header, footer {{visibility:hidden;}}
+@media (max-width:600px) {
+    .spell-title { font-size:1.5rem; }
+    .spell-card { padding:14px; font-size:0.95rem; }
+}
+
+header, footer {visibility:hidden;}
 
 </style>
 """, unsafe_allow_html=True)
+
+st.markdown("<h2 style='text-align:center;'>📜 GRIMORIO</h2>", unsafe_allow_html=True)
 
 # ---------------- CARICAMENTO DATI ----------------
 @st.cache_data
@@ -129,21 +123,39 @@ map_cls = {
     "Stregone":"sorcerer","Warlock":"warlock","Mago":"wizard"
 }
 
-# ---------------- RICERCA ----------------
-st.markdown("### 🔎 Cerca")
-search_text = st.text_input("", placeholder="Scrivi il nome dell'incantesimo...")
+# ---------------- STATO ----------------
+if "selected_spell" not in st.session_state:
+    st.session_state.selected_spell = None
 
-# ---------------- FILTRI ----------------
-with st.expander("🎛️ Filtri"):
+# ---------------- RICERCA CON AUTOCOMPLETE ----------------
+nomi = sorted([s["name_it"] for s in spells])
+
+st.markdown("### 🔎 Cerca Incantesimo")
+
+search_choice = st.selectbox(
+    "",
+    [""] + nomi,
+    index=0,
+    key="searchbox"
+)
+
+# ---------------- FILTRI VISIBILI ----------------
+st.markdown("### 🎛️ Filtri")
+
+col1, col2 = st.columns(2)
+
+with col1:
     classe_sel = st.selectbox("Classe", ["Tutte"] + list(map_cls.keys()))
+
+with col2:
     livelli = sorted(set(int(str(s["level"]).replace("o","0")) for s in spells))
     liv_sel = st.selectbox("Livello", ["Tutti"] + livelli)
 
 # ---------------- FILTRAGGIO ----------------
 filtered = spells
 
-if search_text:
-    filtered = [s for s in filtered if search_text.lower() in s["name_it"].lower()]
+if search_choice:
+    filtered = [s for s in filtered if s["name_it"] == search_choice]
 
 if classe_sel != "Tutte":
     cod = map_cls[classe_sel]
@@ -153,9 +165,6 @@ if liv_sel != "Tutti":
     filtered = [s for s in filtered if int(str(s["level"]).replace("o","0")) == liv_sel]
 
 # ---------------- LISTA ----------------
-if "selected_spell" not in st.session_state:
-    st.session_state.selected_spell = None
-
 if not st.session_state.selected_spell:
 
     st.markdown("### 📜 Incantesimi")
@@ -165,12 +174,20 @@ if not st.session_state.selected_spell:
     else:
         for s in sorted(filtered, key=lambda x: x["name_it"]):
             scuola = s.get("school","").lower()
-            badge = f'<span class="badge badge-{scuola}">{TRAD_SCUOLE.get(scuola,"")}</span>'
+            badge = f"<span class='badge badge-{scuola}'>{TRAD_SCUOLE.get(scuola,'')}</span>"
+
+            preview = s.get("description_it","")[:90] + "..."
+
             if st.button(s["name_it"], use_container_width=True):
                 st.session_state.selected_spell = s["name_it"]
                 st.rerun()
 
-# ---------------- SCHEDA INCANTESIMO ----------------
+            st.markdown(
+                f"{badge} <span style='font-size:0.85rem;color:#aaa;'>{preview}</span>",
+                unsafe_allow_html=True
+            )
+
+# ---------------- SCHEDA ----------------
 else:
     spell = next((s for s in spells if s["name_it"] == st.session_state.selected_spell), None)
 
@@ -187,12 +204,8 @@ else:
 
         badge_html = f"<span class='badge badge-{scuola}'>{TRAD_SCUOLE.get(scuola,'')}</span>"
 
-        concentrazione = ""
-        if "concentrazione" in spell.get("duration","").lower():
-            concentrazione = "<span class='badge' style='background:#b71c1c;color:white;'>Concentrazione</span>"
-
         st.markdown(
-            f"<div class='spell-sub'>{testo_liv} • {badge_html} {concentrazione}</div>",
+            f"<div class='spell-sub'>{testo_liv} • {badge_html}</div>",
             unsafe_allow_html=True
         )
 
