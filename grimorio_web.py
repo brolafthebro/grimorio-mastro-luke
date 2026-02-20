@@ -1,229 +1,114 @@
 import streamlit as st
 import json
 import re
-import os
 
+# --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(
-    page_title="Grimorio Mastro Luke",
-    page_icon="📜",
+    page_title="Grimorio di Mastro Luke",
+    page_icon="📖",
     layout="centered"
 )
 
-# ---------------- CSS MOBILE FIRST ----------------
+# --- CSS PERSONALIZZATO PER LOOK D&D E MOBILE ---
 st.markdown("""
-<style>
-
-.stApp {
-    background-color: #121212;
-    color: #eaeaea;
-    font-family: 'Crimson Pro', serif;
-}
-
-h1,h2,h3,h4,h5,h6,p,span,label {
-    color:#eaeaea !important;
-}
-
-.section-title {
-    font-size:1.1rem;
-    font-weight:bold;
-    margin-top:20px;
-    margin-bottom:10px;
-    color:#ffcc66;
-}
-
-.spell-card {
-    background:#1e1e1e;
-    padding:16px;
-    border-radius:12px;
-    line-height:1.6;
-    margin-bottom:12px;
-}
-
-.spell-title {
-    text-align:center;
-    font-size:1.8rem;
-    font-weight:bold;
-    color:#ffcc66;
-}
-
-.spell-sub {
-    text-align:center;
-    font-style:italic;
-    margin-bottom:12px;
-    color:#bbbbbb;
-}
-
-.dice {
-    color:#ff4d4d;
-    font-weight:bold;
-}
-
-/* Pulsanti colorati */
-button[kind="secondary"] {
-    border-radius:10px !important;
-}
-
-/* Riduce spazio verticale mobile */
-@media (max-width:600px){
-    div[data-testid="column"] {
-        padding:2px !important;
+    <style>
+    .stApp { background-color: #fdf5e6; }
+    .title-text { color: #8b0000; font-family: 'serif'; font-weight: bold; text-align: center; }
+    .spell-card { 
+        background-color: rgba(139, 0, 0, 0.05); 
+        padding: 15px; 
+        border-radius: 10px; 
+        border-left: 5px solid #8b0000;
+        margin-bottom: 20px;
     }
-}
+    .technical-info { color: #1a1a1a; font-size: 0.9em; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; }
+    /* Ottimizzazione per iPhone */
+    @media (max-width: 640px) {
+        .stButton button { width: 100%; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-header, footer {visibility:hidden;}
+# --- LOGICA DI PULIZIA ---
+def pulisci_descrizione(desc, durata):
+    if not desc: return ""
+    testo = desc.strip()
+    durata_clean = durata.lower().replace("concentrazione,", "").strip()
+    
+    # Rimuove frammenti di durata ripetuti all'inizio
+    patterns = [durata_clean, "fino a " + durata_clean, "ora", "minuto", "round", "istantanea"]
+    patterns.sort(key=len, reverse=True)
+    
+    testo_lower = testo.lower()
+    for p in patterns:
+        if testo_lower.startswith(p):
+            testo = testo[len(p):].strip()
+            break
+            
+    # Pulizia caratteri residui e maiuscola
+    testo = re.sub(r'^[.,\s]+', '', testo)
+    return testo[0].upper() + testo[1:] if testo else ""
 
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("<h2 style='text-align:center;'>📜 GRIMORIO</h2>", unsafe_allow_html=True)
-
-# ---------------- LOAD DATA ----------------
+# --- CARICAMENTO DATI ---
 @st.cache_data
 def load_data():
-    for f_name in ["incantesimi_puliti.json", "incantesimi.json"]:
-        if os.path.exists(f_name):
-            with open(f_name, "r", encoding="utf-8") as f:
-                return json.load(f)
-    return []
+    # Prova a caricare il file locale, altrimenti usa l'URL del tuo Gist
+    try:
+        with open("incantesimi.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        import requests
+        url = 'https://gist.githubusercontent.com/vietts/bee17c5aaa7b74f470c8016085864202/raw/dnd-2024-spells-it.json'
+        return requests.get(url).json()
 
 spells = load_data()
 
-TRAD_SCUOLE = {
-    "abjuration":"Abiurazione",
-    "conjuration":"Evocazione",
-    "divination":"Divinazione",
-    "enchantment":"Ammaliamento",
-    "evocation":"Invocazione",
-    "illusion":"Illusione",
-    "necromancy":"Negromanzia",
-    "transmutation":"Trasmutazione"
-}
+# --- INTERFACCIA ---
+st.markdown("<h1 class='title-text'>📖 GRIMORIO DI MASTRO LUKE</h1>", unsafe_allow_html=True)
 
-map_cls = {
-    "Bardo":"bard",
-    "Chierico":"cleric",
-    "Druido":"druid",
-    "Paladino":"paladin",
-    "Ranger":"ranger",
-    "Stregone":"sorcerer",
-    "Warlock":"warlock",
-    "Mago":"wizard"
-}
+# Sidebar per filtri (su mobile finisce nel menu a scomparsa)
+with st.sidebar:
+    st.header("Filtri Ricerca")
+    classe_selezionata = st.selectbox("Classe", ["Tutte", "Bardo", "Chierico", "Druido", "Paladino", "Ranger", "Stregone", "Warlock", "Mago"])
+    livello_selezionato = st.select_slider("Livello Incantesimo", options=list(range(10)), value=0)
 
-# ---------------- SESSION STATE ----------------
-for key in ["selected_spell","selected_class","selected_level"]:
-    if key not in st.session_state:
-        st.session_state[key] = None
+# Mappatura classi
+diz_classi = {"Bardo": "bard", "Chierico": "cleric", "Druido": "druid", "Paladino": "paladin", "Ranger": "ranger", "Stregone": "sorcerer", "Warlock": "warlock", "Mago": "wizard"}
 
-def reset_all():
-    for key in ["selected_spell","selected_class","selected_level"]:
-        st.session_state[key] = None
+# Filtro logico
+filtered_spells = [
+    s for s in spells 
+    if (classe_selezionata == "Tutte" or diz_classi[classe_selezionata] in s.get('classes', []))
+    and int(str(s.get('level', 0)).replace('o','0')) == livello_selezionato
+]
 
-# ---------------- RICERCA LIVE CON PREVIEW ----------------
-st.markdown("<div class='section-title'>🔎 Cerca</div>", unsafe_allow_html=True)
+# Ricerca testuale rapida
+search_query = st.text_input("🔍 Cerca incantesimo per nome...", "").lower()
+if search_query:
+    filtered_spells = [s for s in filtered_spells if search_query in s['name_it'].lower() or search_query in s['name'].lower()]
 
-search = st.text_input("", placeholder="Scrivi nome incantesimo...")
+# Visualizzazione Risultati
+if not filtered_spells:
+    st.warning("Nessun incantesimo trovato con questi filtri.")
+else:
+    nomi_spells = [s['name_it'] for s in filtered_spells]
+    scelta = st.selectbox("Seleziona l'incantesimo da leggere:", nomi_spells)
+    
+    spell = next(s for s in filtered_spells if s['name_it'] == scelta)
+    
+    # Render Dettagli
+    st.markdown(f"<h2 style='color: #8b0000;'>{spell['name_it'].upper()}</h2>", unsafe_allow_html=True)
+    
+    info_tecniche = f"""
+    **Livello:** {spell['level']} | **Scuola:** {spell['school']}  
+    **Tempo di lancio:** {spell['action_type']} | **Gittata:** {spell['range']}  
+    **Durata:** {spell['duration']} | **Concentrazione:** {'Sì' if spell['concentration'] else 'No'}
+    """
+    st.markdown(f"<div class='technical-info'>{info_tecniche}</div>", unsafe_allow_html=True)
+    
+    # Pulizia e visualizzazione descrizione
+    desc_pulita = pulisci_descrizione(spell['description_it'], spell['duration'])
+    st.write("")
+    st.write(desc_pulita)
 
-if search:
-    risultati = sorted(
-        [s for s in spells if search.lower() in s["name_it"].lower()],
-        key=lambda x: x["name_it"]
-    )
-
-    for s in risultati[:8]:
-        preview = s.get("description_it","")[:80] + "..."
-        if st.button(s["name_it"], use_container_width=True):
-            st.session_state.selected_spell = s["name_it"]
-            st.rerun()
-
-        st.markdown(f"<div style='font-size:0.8rem;color:#aaa;margin-bottom:10px;'>{preview}</div>", unsafe_allow_html=True)
-
-# ---------------- CLASSI ----------------
-if not search and not st.session_state.selected_spell:
-
-    st.markdown("<div class='section-title'>🎭 Classi</div>", unsafe_allow_html=True)
-
-    cols = st.columns(2)  # 2 colonne mobile-friendly
-    for i, cls in enumerate(map_cls.keys()):
-        if cols[i % 2].button(cls, use_container_width=True):
-            st.session_state.selected_class = cls
-            st.session_state.selected_level = None
-            st.rerun()
-
-# ---------------- LIVELLI ----------------
-if st.session_state.selected_class and not st.session_state.selected_spell:
-
-    st.markdown(f"<div class='section-title'>🎚 Livelli — {st.session_state.selected_class}</div>", unsafe_allow_html=True)
-
-    cod = map_cls[st.session_state.selected_class]
-
-    spells_class = [s for s in spells if cod in s.get("classes",[])]
-
-    livelli = sorted(
-        set(int(str(s["level"]).replace("o","0")) for s in spells_class)
-    )
-
-    cols = st.columns(len(livelli))
-    for i, lvl in enumerate(livelli):
-        label = "Trucc." if lvl == 0 else str(lvl)
-        if cols[i].button(label, use_container_width=True):
-            st.session_state.selected_level = lvl
-            st.rerun()
-
-# ---------------- LISTA INCANTESIMI ----------------
-if st.session_state.selected_level is not None and not st.session_state.selected_spell:
-
-    cod = map_cls[st.session_state.selected_class]
-
-    spells_filtered = sorted(
-        [
-            s for s in spells
-            if cod in s.get("classes",[])
-            and int(str(s["level"]).replace("o","0")) == st.session_state.selected_level
-        ],
-        key=lambda x: x["name_it"]
-    )
-
-    st.markdown("<div class='section-title'>📜 Incantesimi</div>", unsafe_allow_html=True)
-
-    for s in spells_filtered:
-        if st.button(s["name_it"], use_container_width=True):
-            st.session_state.selected_spell = s["name_it"]
-            st.rerun()
-
-# ---------------- SCHEDA ----------------
-if st.session_state.selected_spell:
-
-    spell = next((s for s in spells if s["name_it"] == st.session_state.selected_spell), None)
-
-    if spell:
-        if st.button("⬅ Torna"):
-            reset_all()
-            st.rerun()
-
-        st.markdown(f"<div class='spell-title'>{spell['name_it']}</div>", unsafe_allow_html=True)
-
-        liv = int(str(spell["level"]).replace("o","0"))
-        testo_liv = "TRUCCHETTO" if liv==0 else f"LIVELLO {liv}"
-        scuola = spell.get("school","").lower()
-
-        st.markdown(
-            f"<div class='spell-sub'>{testo_liv} • {TRAD_SCUOLE.get(scuola,'')}</div>",
-            unsafe_allow_html=True
-        )
-
-        st.markdown("<hr>", unsafe_allow_html=True)
-
-        desc = spell.get("description_it","")
-        desc = re.sub(r'(\d+d\d+|\b\d+\b)', r'<span class="dice">\\1</span>', desc)
-
-        st.markdown(
-            f"<div class='spell-card'>{desc.replace(chr(10),'<br>')}</div>",
-            unsafe_allow_html=True
-        )
-
-        if spell.get("higher_levels_it"):
-            st.markdown(
-                f"<div style='margin-top:12px;'><b>Ai Livelli Superiori:</b> {spell['higher_levels_it']}</div>",
-                unsafe_allow_html=True
-            )
+st.caption("Creato da Mastro Luke - D&D 2024")
