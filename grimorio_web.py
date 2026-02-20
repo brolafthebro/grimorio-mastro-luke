@@ -3,112 +3,148 @@ import json
 import re
 
 # --- CONFIGURAZIONE PAGINA ---
-st.set_page_config(
-    page_title="Grimorio di Mastro Luke",
-    page_icon="📖",
-    layout="centered"
-)
+st.set_page_config(page_title="Grimorio Mastro Luke", page_icon="📖", layout="centered")
 
-# --- CSS PERSONALIZZATO PER LOOK D&D E MOBILE ---
+# --- CSS PER COLORI D&D E MOBILE ---
 st.markdown("""
     <style>
     .stApp { background-color: #fdf5e6; }
-    .title-text { color: #8b0000; font-family: 'serif'; font-weight: bold; text-align: center; }
-    .spell-card { 
-        background-color: rgba(139, 0, 0, 0.05); 
-        padding: 15px; 
-        border-radius: 10px; 
-        border-left: 5px solid #8b0000;
-        margin-bottom: 20px;
-    }
-    .technical-info { color: #1a1a1a; font-size: 0.9em; border-bottom: 1px solid #1a1a1a; padding-bottom: 10px; }
-    /* Ottimizzazione per iPhone */
-    @media (max-width: 640px) {
-        .stButton button { width: 100%; }
+    .main-title { color: #8b0000; font-family: 'serif'; font-weight: bold; text-align: center; margin-bottom: 0px; }
+    .sub-title { color: #1a1a1a; font-family: 'serif'; text-align: center; margin-bottom: 30px; font-size: 1.2em; }
+    .welcome-msg { text-align: center; color: #1a1a1a; font-style: italic; margin: 20px 0; }
+    
+    /* Testo descrizione (Nero su Pergamena) */
+    .spell-desc { color: #1a1a1a !important; font-size: 1.1em; line-height: 1.6; }
+    .technical-box { border-top: 2px solid #8b0000; border-bottom: 2px solid #8b0000; padding: 10px 0; margin: 10px 0; color: #1a1a1a; }
+    
+    /* Pulsanti Classi 2x4 */
+    div.stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        height: 60px;
+        font-weight: bold;
+        text-transform: uppercase;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGICA DI PULIZIA ---
+# --- LOGICA DI PULIZIA (Dal tuo script originale) ---
 def pulisci_descrizione(desc, durata):
-    if not desc: return ""
+    if not desc: return "Descrizione non disponibile."
     testo = desc.strip()
+    # Rimuove residui della durata all'inizio del testo
     durata_clean = durata.lower().replace("concentrazione,", "").strip()
-    
-    # Rimuove frammenti di durata ripetuti all'inizio
-    patterns = [durata_clean, "fino a " + durata_clean, "ora", "minuto", "round", "istantanea"]
+    patterns = [durata_clean, f"fino a {durata_clean}", "ora", "minuto", "round", "istantanea", "a 1 ora"]
     patterns.sort(key=len, reverse=True)
     
-    testo_lower = testo.lower()
     for p in patterns:
-        if testo_lower.startswith(p):
+        if testo.lower().startswith(p):
             testo = testo[len(p):].strip()
             break
-            
-    # Pulizia caratteri residui e maiuscola
-    testo = re.sub(r'^[.,\s]+', '', testo)
+    
+    while testo and testo[0] in ".,:; ": testo = testo[1:].strip()
     return testo[0].upper() + testo[1:] if testo else ""
 
 # --- CARICAMENTO DATI ---
 @st.cache_data
 def load_data():
-    # Prova a caricare il file locale, altrimenti usa l'URL del tuo Gist
     try:
         with open("incantesimi.json", "r", encoding="utf-8") as f:
             return json.load(f)
     except:
-        import requests
-        url = 'https://gist.githubusercontent.com/vietts/bee17c5aaa7b74f470c8016085864202/raw/dnd-2024-spells-it.json'
-        return requests.get(url).json()
+        return []
 
 spells = load_data()
 
-# --- INTERFACCIA ---
-st.markdown("<h1 class='title-text'>📖 GRIMORIO DI MASTRO LUKE</h1>", unsafe_allow_html=True)
+# --- STATO DELL'APP ---
+if 'view' not in st.session_state: st.session_state.view = 'home'
+if 'classe' not in st.session_state: st.session_state.classe = None
+if 'livello' not in st.session_state: st.session_state.livello = None
 
-# Sidebar per filtri (su mobile finisce nel menu a scomparsa)
-with st.sidebar:
-    st.header("Filtri Ricerca")
-    classe_selezionata = st.selectbox("Classe", ["Tutte", "Bardo", "Chierico", "Druido", "Paladino", "Ranger", "Stregone", "Warlock", "Mago"])
-    livello_selezionato = st.select_slider("Livello Incantesimo", options=list(range(10)), value=0)
+# --- HEADER ---
+st.markdown("<h1 class='main-title'>GRIMORIO INCANTESIMI</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>5E D&D 2024 ITA</p>", unsafe_allow_html=True)
 
-# Mappatura classi
-diz_classi = {"Bardo": "bard", "Chierico": "cleric", "Druido": "druid", "Paladino": "paladin", "Ranger": "ranger", "Stregone": "sorcerer", "Warlock": "warlock", "Mago": "wizard"}
+# --- FUNZIONI DI NAVIGAZIONE ---
+def vai_a_home(): st.session_state.view = 'home'
 
-# Filtro logico
-filtered_spells = [
-    s for s in spells 
-    if (classe_selezionata == "Tutte" or diz_classi[classe_selezionata] in s.get('classes', []))
-    and int(str(s.get('level', 0)).replace('o','0')) == livello_selezionato
-]
-
-# Ricerca testuale rapida
-search_query = st.text_input("🔍 Cerca incantesimo per nome...", "").lower()
-if search_query:
-    filtered_spells = [s for s in filtered_spells if search_query in s['name_it'].lower() or search_query in s['name'].lower()]
-
-# Visualizzazione Risultati
-if not filtered_spells:
-    st.warning("Nessun incantesimo trovato con questi filtri.")
-else:
-    nomi_spells = [s['name_it'] for s in filtered_spells]
-    scelta = st.selectbox("Seleziona l'incantesimo da leggere:", nomi_spells)
+# --- 1. LANDING PAGE / HOME ---
+if st.session_state.view == 'home':
+    # Barra di ricerca con preview (simula il tuo Listbox)
+    search_query = st.text_input("🔍 Cerca incantesimo...", placeholder="Scrivi il nome...").strip().lower()
     
-    spell = next(s for s in filtered_spells if s['name_it'] == scelta)
+    if search_query:
+        suggerimenti = [s for s in spells if search_query in s['name_it'].lower()][:5]
+        for s in suggerimenti:
+            if st.button(f"📖 {s['name_it']}", key=f"search_{s['name_it']}"):
+                st.session_state.spell_selezionata = s
+                st.session_state.view = 'dettaglio'
+                st.rerun()
+
+    st.markdown("<p class='welcome-msg'>Benvenuto, Viandante. Cerca un incantesimo o seleziona una classe</p>", unsafe_allow_html=True)
     
-    # Render Dettagli
-    st.markdown(f"<h2 style='color: #8b0000;'>{spell['name_it'].upper()}</h2>", unsafe_allow_html=True)
+    # Griglia Classi 2x4
+    classi = [
+        ("Bardo", "🎵", "#E6CCFF"), ("Chierico", "🛡️", "#FFFFFF"), 
+        ("Druido", "🌿", "#D5F5E3"), ("Paladino", "⚔️", "#F9E79F"),
+        ("Ranger", "🏹", "#ABEBC6"), ("Stregone", "🔥", "#FAD7A0"), 
+        ("Warlock", "👁️", "#EBDEF0"), ("Mago", "📖", "#D6EAF8")
+    ]
     
-    info_tecniche = f"""
-    **Livello:** {spell['level']} | **Scuola:** {spell['school']}  
-    **Tempo di lancio:** {spell['action_type']} | **Gittata:** {spell['range']}  
-    **Durata:** {spell['duration']} | **Concentrazione:** {'Sì' if spell['concentration'] else 'No'}
+    cols = st.columns(2)
+    for i, (nome, icona, colore) in enumerate(classi):
+        with cols[i % 2]:
+            if st.button(f"{icona} {nome}"):
+                st.session_state.classe = nome
+                st.session_state.view = 'livelli'
+                st.rerun()
+
+# --- 2. SELEZIONE LIVELLO ---
+elif st.session_state.view == 'livelli':
+    st.subheader(f"Classe: {st.session_state.classe}")
+    if st.button("⬅️ Torna alle Classi"): vai_a_home(); st.rerun()
+    
+    livelli = ["Trucchetti"] + [f"Livello {i}" for i in range(1, 10)]
+    cols_liv = st.columns(2)
+    for i, liv in enumerate(livelli):
+        with cols_liv[i % 2]:
+            if st.button(liv):
+                st.session_state.livello = i
+                st.session_state.view = 'lista_spells'
+                st.rerun()
+
+# --- 3. LISTA INCANTESIMI ---
+elif st.session_state.view == 'lista_spells':
+    st.subheader(f"{st.session_state.classe} - Lvl {st.session_state.livello}")
+    if st.button("⬅️ Cambia Livello"): st.session_state.view = 'livelli'; st.rerun()
+    
+    codice_classe = {"Bardo": "bard", "Chierico": "cleric", "Druido": "druid", "Paladino": "paladin", "Ranger": "ranger", "Stregone": "sorcerer", "Warlock": "warlock", "Mago": "wizard"}[st.session_state.classe]
+    
+    lista = [s for s in spells if codice_classe in s.get('classes', []) and int(s.get('level', 0)) == st.session_state.livello]
+    
+    for s in sorted(lista, key=lambda x: x['name_it']):
+        if st.button(s['name_it'], key=s['name_it']):
+            st.session_state.spell_selezionata = s
+            st.session_state.view = 'dettaglio'
+            st.rerun()
+
+# --- 4. DETTAGLIO INCANTESIMO ---
+elif st.session_state.view == 'dettaglio':
+    s = st.session_state.spell_selezionata
+    if st.button("⬅️ Torna alla lista"): st.session_state.view = 'lista_spells'; st.rerun()
+    
+    st.markdown(f"<h2 style='color: #8b0000; text-align:center;'>{s['name_it'].upper()}</h2>", unsafe_allow_html=True)
+    
+    # Info tecniche (Nero su pergamena)
+    info = f"""
+    <div class='technical-box'>
+    <b>Livello:</b> {s['level']} | <b>Tempo:</b> {s['action_type']}<br>
+    <b>Gittata:</b> {s.get('range', 'Varia')} | <b>Durata:</b> {s.get('duration', 'Istantanea')}<br>
+    <b>Componenti:</b> {', '.join(s.get('components', []))}
+    </div>
     """
-    st.markdown(f"<div class='technical-info'>{info_tecniche}</div>", unsafe_allow_html=True)
+    st.markdown(info, unsafe_allow_html=True)
     
-    # Pulizia e visualizzazione descrizione
-    desc_pulita = pulisci_descrizione(spell['description_it'], spell['duration'])
-    st.write("")
-    st.write(desc_pulita)
-
-st.caption("Creato da Mastro Luke - D&D 2024")
+    # Descrizione pulita
+    testo_pulito = pulisci_descrizione(s['description_it'], s['duration'])
+    st.markdown(f"<div class='spell-desc'>{testo_pulito}</div>", unsafe_allow_html=True)
