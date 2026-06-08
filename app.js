@@ -10198,7 +10198,6 @@ function renderCards() {
         return;
     }
 
-    // Dizionario per tradurre al volo le scuole di magia dall'inglese all'italiano
     const traduzioneScuole = {
         'abjuration': 'Abiurazione',
         'conjuration': 'Evocazione',
@@ -10213,9 +10212,36 @@ function renderCards() {
     allSpells.forEach(spell => {
         if (!selectedSpellSlugs.has(spell.slug)) return;
 
-        // Recupera la scuola e controlla se serve tradurla
         let scuolaInglese = (spell.school_it || spell.school || '').toLowerCase().trim();
         let scuolaItaliano = traduzioneScuole[scuolaInglese] || spell.school_it || spell.school || 'Sconosciuta';
+
+        // --- SISTEMA DI INTERCETTAZIONE DEI TEMPI DI LANCIO ---
+        let tempoLancio = '1 Azione'; // Valore di default standard
+
+        // Uniamo tutti i testi delle possibili proprietà temporali per fare una ricerca sicura
+        let stringaTempi = (
+            (spell.casting_time_it || '') + ' ' + 
+            (spell.casting_time || '') + ' ' + 
+            (spell.time || '') + ' ' + 
+            (spell.activation || '')
+        ).toLowerCase();
+
+        // Controlliamo cosa c'è scritto dentro per tradurlo correttamente
+        if (stringaTempi.includes('bonus')) {
+            tempoLancio = '1 Az. Bonus';
+        } else if (stringaTempi.includes('reaction') || stringaTempi.includes('reazione')) {
+            tempoLancio = '1 Reazione';
+        } else if (stringaTempi.includes('minute') || stringaTempi.includes('minut')) {
+            // Estrae il numero di minuti se presente (es. "10 minutes" -> "10 Minuti")
+            let matchMin = stringaTempi.match(/(\d+)\s*min/);
+            tempoLancio = matchMin ? `${matchMin[1]} Minuti` : '1 Minuto';
+        } else if (stringaTempi.includes('hour') || stringaTempi.includes('or')) {
+            let matchOre = stringaTempi.match(/(\d+)\s*(hour|or)/);
+            tempoLancio = matchOre ? `${matchOre[1]} Ore` : '1 Ora';
+        } else if (spell.casting_time_it || spell.casting_time) {
+            // Se non è nessuna delle precedenti ma c'è un testo valido, usiamo quello pulito
+            tempoLancio = spell.casting_time_it || spell.casting_time;
+        }
 
         // Fronte della Carta
         const cardFronte = document.createElement('div');
@@ -10226,7 +10252,7 @@ function renderCards() {
                 <div class="level-hexagon">${spell.level}</div>
             </div>
             <div class="card-grid-meta">
-                <div class="meta-box"><span class="meta-label">TEMPO</span><span class="meta-val">${spell.casting_time_it || spell.casting_time}</span></div>
+                <div class="meta-box"><span class="meta-label">TEMPO</span><span class="meta-val">${tempoLancio}</span></div>
                 <div class="meta-box"><span class="meta-label">GITTATA</span><span class="meta-val">${spell.range_it || spell.range}</span></div>
                 <div class="meta-box"><span class="meta-label">DURATA</span><span class="meta-val">${spell.duration_it || spell.duration}</span></div>
                 <div class="meta-box"><span class="meta-label">COMP.</span><span class="meta-val">${spell.components}</span></div>
@@ -10243,7 +10269,6 @@ function renderCards() {
         container.appendChild(cardFronte);
     });
 
-    // Avvia il ridimensionamento intelligente adattivo del testo
     setTimeout(autoShrinkSpells, 50);
 }
 
@@ -10251,18 +10276,13 @@ function autoShrinkSpells() {
     const bodies = document.querySelectorAll('.card-body');
     
     bodies.forEach(body => {
-        // 1. Definiamo i limiti: massimo 13px per i testi corti, minimo 7px per i papiri
         let fontSize = 13.0; 
         body.style.fontSize = fontSize + 'px';
         body.style.lineHeight = '1.25';
 
-        // 2. Se il testo ci sta largo ed è corto, si stabilizzerà vicino ai 12-13px.
-        // Se invece esce dai bordi (scrollHeight > clientHeight), lo rimpiccioliamo al volo
         while (body.scrollHeight > body.clientHeight && fontSize > 7.0) {
             fontSize -= 0.2;
             body.style.fontSize = fontSize + 'px';
-            
-            // Se il testo è super critico e scende sotto i 9px, compattiamo leggermente l'interlinea
             if (fontSize < 9.5) {
                 body.style.lineHeight = '1.1';
             } else {
