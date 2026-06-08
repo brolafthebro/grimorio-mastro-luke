@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grimorio D&D 5.5e</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <aside class="sidebar no-print">
+            <div class="sidebar-header">
+                <h2>Grimorio D&D 5.5e</h2>
+                <button class="btn-print" onclick="window.print()">Stampa Carte 🖨️</button>
+            </div>
+
+            <div class="filter-box">
+                <input type="text" id="search-bar" placeholder="Cerca incantesimo...">
+                
+                <div class="select-row">
+                    <select id="filter-class">
+                        <option value="">Tutte le Classi</option>
+                        <option value="cleric">Chierico</option>
+                        <option value="druid">Druido</option>
+                        <option value="wizard">Mago</option>
+                        <option value="bard">Bardo</option>
+                        <option value="warlock">Warlock</option>
+                        <option value="sorcerer">Stregone</option>
+                        <option value="paladin">Paladino</option>
+                        <option value="ranger">Ranger</option>
+                    </select>
+
+                    <select id="filter-level">
+                        <option value="">Tutti i Livelli</option>
+                        <option value="0">Trucchetto</option>
+                        <option value="1">1° Livello</option>
+                        <option value="2">2° Livello</option>
+                        <option value="3">3° Livello</option>
+                        <option value="4">4° Livello</option>
+                        <option value="5">5° Livello</option>
+                        <option value="6">6° Livello</option>
+                        <option value="7">7° Livello</option>
+                        <option value="8">8° Livello</option>
+                        <option value="9">9° Livello</option>
+                    </select>
+                </div>
+                
+                <div class="selection-actions">
+                    <button id="btn-select-all">Seleziona Filtrati</button>
+                    <button id="btn-clear-all">Deseleziona Tutto</button>
+                </div>
+            </div>
+
+            <div id="spells-list-container">
+                </div>
+        </aside>
+
+        <main class="main-content">
+            <div id="cards-container">
+                </div>
+        </main>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
