@@ -1,3 +1,6 @@
+
+
+
 // 1. INCOLLA IL JSON DIETRO AL SEGNO UGUALE
 let allSpells = [
   {
@@ -10057,10 +10060,6 @@ let allSpells = [
 // DA QUI IN POI SOSTITUISCI IL CODICE:
 
 // ==========================================================================
-// LASCIA QUI SOPRA IL TUO BLOCCO "const allSpells = [ ... ]" CON TUTTI I DATI
-// ==========================================================================
-
-// ==========================================================================
 // INCOLLA QUI SOTTO IL TUO BLOCCO "const allSpells = [ ... ]" CON TUTTI I DATI
 // ==========================================================================
 
@@ -10216,31 +10215,34 @@ function renderCards() {
         let scuolaItaliano = traduzioneScuole[scuolaInglese] || spell.school_it || spell.school || 'Sconosciuta';
 
         // --- SISTEMA DI INTERCETTAZIONE DEI TEMPI DI LANCIO ---
-        let tempoLancio = '1 Azione'; // Valore di default standard
+        let tempoLancio = '1 Azione'; 
+        let stringaTempi = ((spell.casting_time_it || '') + ' ' + (spell.casting_time || '') + ' ' + (spell.time || '') + ' ' + (spell.activation || '')).toLowerCase();
 
-        // Uniamo tutti i testi delle possibili proprietà temporali per fare una ricerca sicura
-        let stringaTempi = (
-            (spell.casting_time_it || '') + ' ' + 
-            (spell.casting_time || '') + ' ' + 
-            (spell.time || '') + ' ' + 
-            (spell.activation || '')
-        ).toLowerCase();
-
-        // Controlliamo cosa c'è scritto dentro per tradurlo correttamente
         if (stringaTempi.includes('bonus')) {
             tempoLancio = '1 Az. Bonus';
         } else if (stringaTempi.includes('reaction') || stringaTempi.includes('reazione')) {
             tempoLancio = '1 Reazione';
         } else if (stringaTempi.includes('minute') || stringaTempi.includes('minut')) {
-            // Estrae il numero di minuti se presente (es. "10 minutes" -> "10 Minuti")
             let matchMin = stringaTempi.match(/(\d+)\s*min/);
             tempoLancio = matchMin ? `${matchMin[1]} Minuti` : '1 Minuto';
         } else if (stringaTempi.includes('hour') || stringaTempi.includes('or')) {
             let matchOre = stringaTempi.match(/(\d+)\s*(hour|or)/);
             tempoLancio = matchOre ? `${matchOre[1]} Ore` : '1 Ora';
         } else if (spell.casting_time_it || spell.casting_time) {
-            // Se non è nessuna delle precedenti ma c'è un testo valido, usiamo quello pulito
             tempoLancio = spell.casting_time_it || spell.casting_time;
+        }
+
+        // --- PULITORE AUTOMATICO DELLA DESCRIZIONE ---
+        let descrizionePulita = spell.description_it || spell.description || '';
+
+        // Rimuove residui fastidiosi di traduzione all'inizio del testo (es: "Ore 8", "Minuti 1", "Concentrazione", "Istantanea")
+        // seguiti da spazi, lettere maiuscole o refusi di formattazione
+        descrizionePulita = descrizionePulita.replace(/^(Ore\s*\d+\s*|Minuti\s*\d+\s*|Concentrazione,\s*fino\s*a\s*\d*\s*(ora|ore|minuto|minuti)\s*|Istantanea\s*)/i, '');
+        
+        // Se dopo la pulizia l'incantesimo inizia ancora con una lettera minuscola orfana o uno spazio, diamo una sistemata
+        descrizionePulita = descrizionePulita.trim();
+        if (descrizionePulita.length > 0) {
+            descrizionePulita = descrizionePulita.charAt(0).toUpperCase() + descrizionePulita.slice(1);
         }
 
         // Fronte della Carta
@@ -10258,7 +10260,7 @@ function renderCards() {
                 <div class="meta-box"><span class="meta-label">COMP.</span><span class="meta-val">${spell.components}</span></div>
             </div>
             <div class="card-body">
-                ${spell.description_it || spell.description}
+                ${descrizionePulita}
             </div>
             <div class="card-footer">
                 <div class="footer-school">${scuolaItaliano}</div>
